@@ -1,1 +1,378 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Language Code Editor</title>
+
+<!-- CodeMirror core + theme (CDN — requires internet access, fine for GitHub Pages) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+
+<!-- Language modes -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+
+<!-- Addons: active line highlight, matching brackets, closing brackets/tags -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+
+<style>
+  :root {
+    --panel: #21222c;
+    --border: #3c3c46;
+    --text: #e6e6e6;
+    --accent: #6272a4;
+    --accent-bright: #bd93f9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    background: #14141a;
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 600;
+    color: #fff;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  select, button, input[type="text"] {
+    background: #2d2d3a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  select:hover, button:hover {
+    border-color: var(--accent-bright);
+  }
+  button.primary {
+    background: var(--accent-bright);
+    color: #1e1e2e;
+    border-color: var(--accent-bright);
+    font-weight: 600;
+  }
+  button.primary:hover {
+    background: #d0b3ff;
+  }
+  input[type="text"] {
+    width: 200px;
+    cursor: text;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+  .editor-wrap {
+    flex: 1;
+    overflow: hidden;
+  }
+  .CodeMirror {
+    height: 100% !important;
+    font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  footer {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 6px 20px;
+    font-size: 12px;
+    color: #9d9d9d;
+    display: flex;
+    justify-content: space-between;
+  }
+  .badge {
+    background: var(--accent-bright);
+    color: #1e1e2e;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  #cdnWarning {
+    display: none;
+    background: #442222;
+    color: #ffcccc;
+    padding: 8px 20px;
+    font-size: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="cdnWarning">&#9888; Syntax highlighting libraries failed to load. Check your internet connection — this editor requires CDN access for color coding.</div>
+
+<header>
+  <h1>&#128187; Multi-Language Code Editor</h1>
+  <div class="controls">
+    <label for="langSelect" style="font-size:13px;">Language:</label>
+    <select id="langSelect">
+      <option value="tsql">T-SQL</option>
+      <option value="psql">PostgreSQL (PL/pgSQL)</option>
+      <option value="java">Java</option>
+      <option value="javascript">JavaScript</option>
+      <option value="html">HTML</option>
+      <option value="css">CSS</option>
+      <option value="sql">SQL (ANSI)</option>
+    </select>
+    <button id="templateBtn" title="Insert a starter template for the selected language">Insert Template</button>
+    <input type="text" id="fileName" value="my_code" title="File name for export">
+    <button id="exportBtn" class="primary">Export as .txt</button>
+    <button id="clearBtn">Clear</button>
+  </div>
+</header>
+
+<main>
+  <div class="editor-wrap">
+    <textarea id="codeInput"></textarea>
+  </div>
+</main>
+
+<footer>
+  <span>Lines: <span id="lineCount">1</span> &nbsp;|&nbsp; Characters: <span id="charCount">0</span></span>
+  <span class="badge" id="langBadge">TSQL</span>
+</footer>
+
+<script>
+const modeMap = {
+  tsql: { name: 'text/x-mssql' },
+  psql: { name: 'text/x-pgsql' },
+  java: { name: 'text/x-java' },
+  javascript: { name: 'text/javascript' },
+  html: { name: 'htmlmixed' },
+  css: { name: 'text/css' },
+  sql: { name: 'text/x-sql' }
+};
+
+const extensionMap = {
+  tsql: 'sql', psql: 'sql', java: 'java', javascript: 'js', html: 'html', css: 'css', sql: 'sql'
+};
+
+const templates = {
+  tsql: `-- T-SQL Template
+DECLARE @Name NVARCHAR(50) = 'World';
+
+SELECT TOP 10
+    c.CustomerID,
+    c.CustomerName,
+    COUNT(o.OrderID) AS OrderCount
+FROM dbo.Customers AS c
+LEFT JOIN dbo.Orders AS o
+    ON o.CustomerID = c.CustomerID
+WHERE c.IsActive = 1
+GROUP BY c.CustomerID, c.CustomerName
+ORDER BY OrderCount DESC;
+
+PRINT 'Hello, ' + @Name;
+`,
+  psql: `-- PostgreSQL / PL/pgSQL Template
+DO $$
+DECLARE
+    v_name TEXT := 'World';
+BEGIN
+    RAISE NOTICE 'Hello, %', v_name;
+END $$;
+
+SELECT
+    c.customer_id,
+    c.customer_name,
+    COUNT(o.order_id) AS order_count
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.customer_id
+WHERE c.is_active = TRUE
+GROUP BY c.customer_id, c.customer_name
+ORDER BY order_count DESC
+LIMIT 10;
+`,
+  java: `// Java Template
+public class Main {
+    public static void main(String[] args) {
+        String name = "World";
+        System.out.println("Hello, " + name + "!");
+
+        for (int i = 0; i < 5; i++) {
+            System.out.println("Count: " + i);
+        }
+    }
+}
+`,
+  javascript: `// JavaScript Template
+function greet(name) {
+    return \`Hello, \${name}!\`;
+}
+
+const items = [1, 2, 3, 4, 5];
+const doubled = items.map(x => x * 2);
+
+console.log(greet("World"));
+console.log(doubled);
+`,
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Page</title>
+</head>
+<body>
+    <h1>Hello, World!</h1>
+    <p>This is a starter HTML template.</p>
+</body>
+</html>
+`,
+  css: `/* CSS Template */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.container {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+h1 {
+    color: #007acc;
+}
+`,
+  sql: `-- ANSI SQL Template
+SELECT
+    customer_id,
+    customer_name,
+    order_date
+FROM customers
+INNER JOIN orders
+    ON orders.customer_id = customers.customer_id
+WHERE order_date >= '2026-01-01'
+ORDER BY order_date DESC;
+`
+};
+
+let editor;
+const cdnOk = typeof CodeMirror !== 'undefined';
+
+if (!cdnOk) {
+  document.getElementById('cdnWarning').style.display = 'block';
+} else {
+  editor = CodeMirror.fromTextArea(document.getElementById('codeInput'), {
+    lineNumbers: true,
+    mode: modeMap.tsql,
+    theme: 'dracula',
+    styleActiveLine: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    autoCloseTags: true,
+    tabSize: 4,
+    indentUnit: 4,
+    indentWithTabs: false,
+    lineWrapping: false
+  });
+
+  editor.on('change', updateStats);
+}
+
+const langSelect = document.getElementById('langSelect');
+const langBadge = document.getElementById('langBadge');
+const lineCount = document.getElementById('lineCount');
+const charCount = document.getElementById('charCount');
+const fileNameInput = document.getElementById('fileName');
+const exportBtn = document.getElementById('exportBtn');
+const clearBtn = document.getElementById('clearBtn');
+const templateBtn = document.getElementById('templateBtn');
+
+function getValue() {
+  return cdnOk ? editor.getValue() : document.getElementById('codeInput').value;
+}
+function setValue(v) {
+  if (cdnOk) { editor.setValue(v); } else { document.getElementById('codeInput').value = v; }
+  updateStats();
+}
+function updateStats() {
+  const val = getValue();
+  lineCount.textContent = val.split('\n').length;
+  charCount.textContent = val.length;
+}
+
+langSelect.addEventListener('change', () => {
+  const lang = langSelect.value;
+  langBadge.textContent = lang.toUpperCase();
+  if (cdnOk) { editor.setOption('mode', modeMap[lang]); }
+});
+
+templateBtn.addEventListener('click', () => {
+  const lang = langSelect.value;
+  if (getValue().trim().length > 0) {
+    const proceed = confirm('This will replace current content with a ' + lang.toUpperCase() + ' template. Continue?');
+    if (!proceed) return;
+  }
+  setValue(templates[lang] || '');
+});
+
+clearBtn.addEventListener('click', () => {
+  if (getValue().trim().length === 0) return;
+  const proceed = confirm('Clear all code from the editor?');
+  if (!proceed) return;
+  setValue('');
+});
+
+exportBtn.addEventListener('click', () => {
+  const content = getValue();
+  const lang = langSelect.value;
+  let name = fileNameInput.value.trim() || 'my_code';
+  name = name.replace(/[^a-z0-9_\-\.]/gi, '_');
+
+  const header = '/* Exported ' + lang.toUpperCase() + ' code from Multi-Language Code Editor */\n\n';
+  const blob = new Blob([header + content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+updateStats();
+</script>
+
+</body>
+</html>
